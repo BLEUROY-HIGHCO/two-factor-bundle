@@ -21,12 +21,7 @@ class TwoFactorProviderTest extends TestCase
     /**
      * @var \PHPUnit_Framework_MockObject_MockObject
      */
-    private $templating;
-
-    /**
-     * @var string
-     */
-    private $formTemplate = 'AcmeTestBundle:Test:auth.html.twig';
+    private $renderer;
 
     /**
      * @var TwoFactorProvider
@@ -39,9 +34,9 @@ class TwoFactorProviderTest extends TestCase
 
         $this->authenticator = $this->createMock('Scheb\TwoFactorBundle\Security\TwoFactor\Provider\Email\Validation\CodeValidatorInterface');
 
-        $this->templating = $this->createMock('Symfony\Bundle\FrameworkBundle\Templating\EngineInterface');
+        $this->renderer = $this->createMock('Scheb\TwoFactorBundle\Security\TwoFactor\Renderer');
 
-        $this->provider = new TwoFactorProvider($this->generator, $this->authenticator, $this->templating, $this->formTemplate, 'authCodeName');
+        $this->provider = new TwoFactorProvider($this->generator, $this->authenticator, $this->renderer, 'authCodeName');
     }
 
     /**
@@ -54,7 +49,7 @@ class TwoFactorProviderTest extends TestCase
         $this->authenticator
             ->expects($this->any())
             ->method('checkCode')
-            ->will($this->returnValue($status));
+            ->willReturn($status);
     }
 
     /**
@@ -66,7 +61,7 @@ class TwoFactorProviderTest extends TestCase
         $request
             ->expects($this->any())
             ->method('getUri')
-            ->will($this->returnValue('/some/path'));
+            ->willReturn('/some/path');
 
         return $request;
     }
@@ -83,7 +78,7 @@ class TwoFactorProviderTest extends TestCase
             ->expects($this->any())
             ->method('get')
             ->with('authCodeName')
-            ->will($this->returnValue($code));
+            ->willReturn($code);
 
         return $request;
     }
@@ -99,7 +94,7 @@ class TwoFactorProviderTest extends TestCase
         $user
             ->expects($this->any())
             ->method('isEmailAuthEnabled')
-            ->will($this->returnValue($emailAuthEnabled));
+            ->willReturn($emailAuthEnabled);
 
         return $user;
     }
@@ -123,7 +118,7 @@ class TwoFactorProviderTest extends TestCase
         $session
             ->expects($this->any())
             ->method('getFlashBag')
-            ->will($this->returnValue($flashBag ? $flashBag : $this->getFlashBag()));
+            ->willReturn($flashBag ? $flashBag : $this->getFlashBag());
 
         return $session;
     }
@@ -142,19 +137,19 @@ class TwoFactorProviderTest extends TestCase
         $authContext
             ->expects($this->any())
             ->method('getUser')
-            ->will($this->returnValue($user ? $user : $this->getUser()));
+            ->willReturn($user ? $user : $this->getUser());
         $authContext
             ->expects($this->any())
             ->method('getRequest')
-            ->will($this->returnValue($request ? $request : $this->getRequest()));
+            ->willReturn($request ? $request : $this->getRequest());
         $authContext
             ->expects($this->any())
             ->method('getSession')
-            ->will($this->returnValue($session ? $session : $this->getSession()));
+            ->willReturn($session ? $session : $this->getSession());
         $authContext
             ->expects($this->any())
             ->method('useTrustedOption')
-            ->will($this->returnValue($useTrustedOption));
+            ->willReturn($useTrustedOption);
 
         return $authContext;
     }
@@ -218,13 +213,14 @@ class TwoFactorProviderTest extends TestCase
      */
     public function requestAuthenticationCode_trustedOption_assignToTemplate($trustedOption)
     {
-        //Mock the template engine
-        $this->templating
-            ->expects($this->once())
-            ->method('renderResponse')
-            ->with($this->formTemplate, array('useTrustedOption' => $trustedOption));
-
         $context = $this->getAuthenticationContext(null, null, null, $trustedOption);
+
+        //Mock the template engine
+        $this->renderer
+            ->expects($this->once())
+            ->method('render')
+            ->with($context);
+
         $this->provider->requestAuthenticationCode($context);
     }
 
@@ -255,10 +251,10 @@ class TwoFactorProviderTest extends TestCase
             ->method('checkCode');
 
         //Mock the template engine
-        $this->templating
+        $this->renderer
             ->expects($this->once())
-            ->method('renderResponse')
-            ->will($this->returnValue(new Response('<form></form>')));
+            ->method('render')
+            ->willReturn(new Response('<form></form>'));
 
         $returnValue = $this->provider->requestAuthenticationCode($context);
         $this->assertInstanceOf('Symfony\Component\HttpFoundation\Response', $returnValue);
@@ -301,11 +297,11 @@ class TwoFactorProviderTest extends TestCase
             ->with('two_factor', 'scheb_two_factor.code_invalid');
 
         //Mock the template engine
-        $this->templating
+        $this->renderer
             ->expects($this->once())
-            ->method('renderResponse')
-            ->with($this->formTemplate, $this->anything())
-            ->will($this->returnValue(new Response('<form></form>')));
+            ->method('render')
+            ->with($context)
+            ->willReturn(new Response('<form></form>'));
 
         $returnValue = $this->provider->requestAuthenticationCode($context);
         $this->assertInstanceOf('Symfony\Component\HttpFoundation\Response', $returnValue);
